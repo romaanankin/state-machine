@@ -1,5 +1,6 @@
 package com
 
 object Main extends App {
-print(Config.bootstrap + Config.inputEntityTopic + Config.inputStateTopic+ Config.stringSerializer)
+  val producer = new StateMachineKafkaProducer()
+  producer.sendToKafka("t","k","main")
 }

@@ -25,5 +25,4 @@ class StateMachineKafkaProducer {
         metadata.get().offset())
     }
   }
-  producer.close()
 }

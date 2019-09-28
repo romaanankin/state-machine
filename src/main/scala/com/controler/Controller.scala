@@ -1,18 +1,21 @@
 package com.controler
 
+import akka.Done
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.stream.ActorMaterializer
-import akka.Done
-import akka.http.scaladsl.server.Route
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
+import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.{RejectionHandler, Route}
+import akka.stream.ActorMaterializer
+import com.{Entity, State}
 import spray.json.DefaultJsonProtocol._
 import spray.json.RootJsonFormat
+import StatusCodes._
+import akka.http.scaladsl.server.Directives._
 
-import scala.io.StdIn
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.io.StdIn
 
 object Controller {
   implicit val system: ActorSystem = ActorSystem()
@@ -22,20 +25,28 @@ object Controller {
   //state store
   var entities: List[Entity] = Nil
 
-  final case class Entity(name: String, id: Long)
-  final case class State(state: String)
+  implicit val stateFormat: RootJsonFormat[State] = jsonFormat1(State)
+  implicit val entityFormat: RootJsonFormat[Entity] = jsonFormat3(Entity)
+  implicit val entityDAOFormat: RootJsonFormat[EntityDAO] = jsonFormat1(EntityDAO)
 
-  implicit val itemFormat: RootJsonFormat[Entity] = jsonFormat2(Entity)
+  implicit def myRejectionHandler: RejectionHandler =
+    RejectionHandler.newBuilder()
+      .handleNotFound {
+        complete((NotFound, "{\n\t\"error\": \"Not found\"\n}"))
+      }
+      .result()
+
+  final case class EntityDAO(name: String)
 
   // (fake) state store database query api
-  def fetchItem(itemId: Long): Future[Option[Entity]] = Future {
+  def fetchItem(itemId: String): Future[Option[Entity]] = Future {
     entities.find(o => o.id == itemId)
   }
 
   def saveEntity(entity: Entity): Future[Done] = {
     entities = entity match {
         //save to ss logic
-      case Entity(name,id) => List(entity) ::: entities
+      case Entity(id,name,initialState) => List(Entity(id,name,initialState)) ::: entities
       case _               => entities
     }
     Future { Done }
@@ -46,22 +57,25 @@ object Controller {
     val route: Route =
       concat(
         get {
-          pathPrefix("entity" / LongNumber) { id =>
-            // there might be no item for a given id
-            val maybeItem: Future[Option[Entity]] = fetchItem(id)
+          pathPrefix("entity" / Remaining) { id =>
+            val maybeEntity: Future[Option[Entity]] = fetchItem(id)
 
-            onSuccess(maybeItem) {
+            onSuccess(maybeEntity) {
               case Some(item) => complete(item)
-              case None       => complete(StatusCodes.NotFound)
+              case None       => complete(StatusCodes.NotFound,"{\n\t\"error\": \"Not found\"\n}")
             }
           }
         },
         post {
           path("entity-create") {
-            entity(as[Entity]) { entity =>
-              val saved: Future[Done] = saveEntity(entity)
+            val UUID = System.currentTimeMillis + "node-name"
+            val initialState = State("init")
+
+            entity(as[EntityDAO]) { entityDAO =>
+              val entityToSave = Entity(UUID, entityDAO.name, initialState)
+              val saved: Future[Done] = saveEntity(entityToSave)
               onComplete(saved) { done =>
-                complete(entity)
+                complete(entityToSave)
               }
             }
           }

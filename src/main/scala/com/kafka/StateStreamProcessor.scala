@@ -1,15 +1,16 @@
-package com
+package com.kafka
 
 import java.util.Properties
 
+import com.Config
 import org.apache.kafka.streams.scala.ImplicitConversions._
 import org.apache.kafka.streams.scala.StreamsBuilder
 import org.apache.kafka.streams.scala.kstream.{KTable, Materialized}
 import org.apache.kafka.streams.state.{QueryableStoreTypes, ReadOnlyKeyValueStore}
 import org.apache.kafka.streams.{KafkaStreams, StreamsConfig}
 
-object StateStreamProcessor {
-import org.apache.kafka.streams.scala.Serdes._
+object StateStreamProcessor extends App {
+  import org.apache.kafka.streams.scala.Serdes._
 
   val props: Properties = {
     val p = new Properties()
@@ -28,9 +29,9 @@ import org.apache.kafka.streams.scala.Serdes._
   streams.start()
 
   Thread.sleep(10000)
-    val keyValueStore: ReadOnlyKeyValueStore[String, String] =
-      streams.store("counts-store", QueryableStoreTypes.keyValueStore[String,String]())
-   keyValueStore.all().forEachRemaining(println)
+    val entityStateStore: ReadOnlyKeyValueStore[String, String] =
+      streams.store("entity-store", QueryableStoreTypes.keyValueStore[String,String]())
+   entityStateStore.all().forEachRemaining(println)
 
     println(streams.state())
 }

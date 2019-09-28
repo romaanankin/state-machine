@@ -1,7 +1,8 @@
-package com
+package com.kafka
 
 import java.util.Properties
 
+import com.Config
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
 
 import scala.util.Try

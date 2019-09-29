@@ -1,0 +1,8 @@
+{
+  "name": "Entity create json"
+},
+
+{
+"state":{"state":"super"},
+"transitions":["init","pending"]
+}

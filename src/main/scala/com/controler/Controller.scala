@@ -11,24 +11,19 @@ import akka.http.scaladsl.server.{RejectionHandler, Route}
 import akka.stream.ActorMaterializer
 import com.model._
 import com.Util._
+import com.service.{EntityService, StateMatrixService}
 import spray.json.DefaultJsonProtocol._
 import spray.json.RootJsonFormat
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.io.StdIn
 
-//add service to controller
-class Controller {
+class Controller(implicit entityService: EntityService, stateMatrixService: StateMatrixService) {
   implicit val system: ActorSystem = ActorSystem()
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
 
-  //state store
-  var entities: List[Entity] = Nil
-
   final case class EntityDAO(name: String)
-//  implicit val stateFormat: RootJsonFormat[State] = jsonFormat1(State)
-//  implicit val entityFormat: RootJsonFormat[Entity] = jsonFormat3(Entity)
   implicit val entityDAOFormat: RootJsonFormat[EntityDAO] = jsonFormat1(EntityDAO)
 
   implicit def myRejectionHandler: RejectionHandler =
@@ -38,18 +33,20 @@ class Controller {
       }
       .result()
 
-  // (fake) state store database query api
   def fetchEntity(itemId: String): Future[Option[Entity]] = Future {
-    entities.find(o => o.id == itemId)
+    entityService.fetch(itemId)
   }
 
-  def saveEntity(entity: Entity): Future[Done] = {
-    entities = entity match {
-        //save to ss logic
-      case Entity(id,name,initialState) => List(Entity(id,name,initialState)) ::: entities
-      case _               => entities
-    }
-    Future { Done }
+  def saveEntity(entity: Entity): Future[Option[Entity]] = Future {
+    entityService.save(entity)
+  }
+
+  def saveStateMatrix(state: StateMatrix): Future[Option[StateMatrix]] = Future {
+    stateMatrixService.save(state)
+  }
+
+  def fetchStateMatrix(itemId: String): Future[Option[StateMatrix]] = Future {
+    stateMatrixService.fetch(itemId)
   }
 
   def init() {
@@ -68,15 +65,41 @@ class Controller {
         },
         post {
           path("entity-create") {
-            val UUID = System.currentTimeMillis + "node-name"
+            val UUID = System.currentTimeMillis + "-node-name"
             val initialState = State("init")
+            val pendingState = State("pending")
 
             entity(as[EntityDAO]) { entityDAO =>
-              val entityToSave = Entity(UUID, entityDAO.name, initialState)
-              val saved: Future[Done] = saveEntity(entityToSave)
-              onComplete(saved) { done =>
-                complete(entityToSave)
+              val entityToSave = Entity(UUID, entityDAO.name, initialState,pendingState)
+              val saved: Future[Option[Entity]] = saveEntity(entityToSave)
+              onSuccess(saved) {
+                case Some(entity) => complete(entity)
+                case None         =>
+                  complete(StatusCodes.InternalServerError,"{\n\t\"error\": \"Server ERROR. Not saved\"\n}")
               }
+            }
+          }
+        },
+        post {
+          path("state-matrix") {
+            entity(as[StateMatrix]) { stateMatrix =>
+              val saved: Future[Option[StateMatrix]] = saveStateMatrix(stateMatrix)
+              onSuccess(saved) {
+                case Some(state) => complete(state)
+                case None              =>
+                  complete(StatusCodes.InternalServerError,"{\n\t\"error\": \"Server ERROR. Not saved\"\n}")
+
+              }
+            }
+          }
+        },
+        get {
+          pathPrefix("state-matrix" / Remaining) { id =>
+            val maybeMatrix: Future[Option[StateMatrix]] = fetchStateMatrix(id)
+
+            onSuccess(maybeMatrix) {
+              case Some(item) => complete(item)
+              case None       => complete(StatusCodes.NotFound,"{\n\t\"error\": \"Not found\"\n}")
             }
           }
         }

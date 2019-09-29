@@ -25,7 +25,6 @@ class StateStreamProcessor(implicit config: Config)  {
 
   private val builder: StreamsBuilder = new StreamsBuilder
 
-  //always setup topics first
   protected val entityStream: KTable[String, String] = builder.table[String, String](config.inputEntityTopic)
   entityStream.filter((_, _) => true, Materialized.as(config.entityStateStore))
 

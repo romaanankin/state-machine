@@ -5,19 +5,20 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{RejectionHandler, Route}
 import akka.stream.ActorMaterializer
-import com.{Entity, State}
+import com.model._
+import com.Util._
 import spray.json.DefaultJsonProtocol._
 import spray.json.RootJsonFormat
-import StatusCodes._
-import akka.http.scaladsl.server.Directives._
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.io.StdIn
 
-object Controller {
+//add service to controller
+class Controller {
   implicit val system: ActorSystem = ActorSystem()
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
@@ -25,8 +26,9 @@ object Controller {
   //state store
   var entities: List[Entity] = Nil
 
-  implicit val stateFormat: RootJsonFormat[State] = jsonFormat1(State)
-  implicit val entityFormat: RootJsonFormat[Entity] = jsonFormat3(Entity)
+  final case class EntityDAO(name: String)
+//  implicit val stateFormat: RootJsonFormat[State] = jsonFormat1(State)
+//  implicit val entityFormat: RootJsonFormat[Entity] = jsonFormat3(Entity)
   implicit val entityDAOFormat: RootJsonFormat[EntityDAO] = jsonFormat1(EntityDAO)
 
   implicit def myRejectionHandler: RejectionHandler =
@@ -36,10 +38,8 @@ object Controller {
       }
       .result()
 
-  final case class EntityDAO(name: String)
-
   // (fake) state store database query api
-  def fetchItem(itemId: String): Future[Option[Entity]] = Future {
+  def fetchEntity(itemId: String): Future[Option[Entity]] = Future {
     entities.find(o => o.id == itemId)
   }
 
@@ -52,13 +52,13 @@ object Controller {
     Future { Done }
   }
 
-  def main(args: Array[String]) {
+  def init() {
 
     val route: Route =
       concat(
         get {
           pathPrefix("entity" / Remaining) { id =>
-            val maybeEntity: Future[Option[Entity]] = fetchItem(id)
+            val maybeEntity: Future[Option[Entity]] = fetchEntity(id)
 
             onSuccess(maybeEntity) {
               case Some(item) => complete(item)

@@ -1,8 +1,18 @@
-{
-  "name": "Entity create json"
-},
+
+
+//To create Entity
 
 {
+  "name": "Entity create json"
+}
+
+// to fullfil state matrix
+{
 "state":{"state":"super"},
-"transitions":["init","pending"]
+"transitions":["Possible","transitions","pending for instance"]
+}
+
+//to change Entity state
+{
+"state": "state to change"
 }

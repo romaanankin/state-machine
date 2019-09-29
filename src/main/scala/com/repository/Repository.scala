@@ -16,7 +16,7 @@ class EntityRepository(implicit kafkaProducer: StateMachineKafkaProducer,
 
   override def save(entity: Entity): Option[Entity] = {
      try {
-       kafkaProducer.sendToKafka(entity.id, entity.toJson.toString(),
+       kafkaProducer.sendToKafka(entity.entity_id, entity.toJson.toString(),
          config.inputEntityTopic)
        Some(entity)
      } catch {

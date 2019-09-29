@@ -1,6 +1,5 @@
 package com.controler
 
-import akka.Done
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
@@ -9,8 +8,8 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{RejectionHandler, Route}
 import akka.stream.ActorMaterializer
-import com.model._
 import com.Util._
+import com.model._
 import com.service.{EntityService, StateMatrixService}
 import spray.json.DefaultJsonProtocol._
 import spray.json.RootJsonFormat
@@ -53,18 +52,40 @@ class Controller(implicit entityService: EntityService, stateMatrixService: Stat
 
     val route: Route =
       concat(
+        post {
+          path("state" / Remaining) { id =>
+            entity(as[State]) { state =>
+              val futureEntity = fetchEntity(id)
+              onSuccess(futureEntity) {
+                case None => complete(StatusCodes.BadRequest, "{\n\t\"error\": \"No such entity\"\n}")
+                case Some(entity) =>
+                  onSuccess(fetchStateMatrix(entity.to.state)) {
+                    case Some(matrix) =>  if (matrix.transitions.contains(state.state))
+
+                      onSuccess(Future(entityService.save(Entity(entity.entity_id, entity.name, entity.to, state)))) {
+                        case Some(ent) => complete(ent)
+                        case None      => complete(StatusCodes.InternalServerError,"{\n\t\"error\": \"Server ERROR. Not saved\"\n}")
+                      }
+                    else
+                      complete(StatusCodes.BadRequest, "{\n\t\"error\": \"No such state to change\"\n}")
+                    case None         =>  complete(StatusCodes.BadRequest, "{\n\t\"error\": \"No such statte to change\"\n}")
+                  }
+              }
+            }
+          }
+        },
         get {
           pathPrefix("entity" / Remaining) { id =>
             val maybeEntity: Future[Option[Entity]] = fetchEntity(id)
 
             onSuccess(maybeEntity) {
               case Some(item) => complete(item)
-              case None       => complete(StatusCodes.NotFound,"{\n\t\"error\": \"Not found\"\n}")
+              case None       => complete(StatusCodes.NotFound,"{\n\t\"error\": \"Not such entity\"\n}")
             }
           }
         },
         post {
-          path("entity-create") {
+          path("entity") {
             val UUID = System.currentTimeMillis + "-node-name"
             val initialState = State("init")
             val pendingState = State("pending")

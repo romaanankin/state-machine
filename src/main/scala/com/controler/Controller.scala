@@ -13,17 +13,19 @@ import akka.stream.ActorMaterializer
 import com.Util._
 import com.model._
 import com.service.{EntityService, StateMatrixService}
+import com.typesafe.scalalogging.Logger
 import spray.json.DefaultJsonProtocol._
 import spray.json.RootJsonFormat
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.io.StdIn
 import scala.util.Success
 
 class Controller(implicit entityService: EntityService, stateMatrixService: StateMatrixService) {
   implicit val system: ActorSystem = ActorSystem()
   implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val executionContext: ExecutionContextExecutor = system.dispatcher
+
+  private val logger = Logger(classOf[Controller])
 
   final case class EntityDAO(name: String)
   implicit val entityDAOFormat: RootJsonFormat[EntityDAO] = jsonFormat1(EntityDAO)
@@ -35,46 +37,50 @@ class Controller(implicit entityService: EntityService, stateMatrixService: Stat
       }
       .result()
 
-  def fetchEntity(itemId: String): Future[Option[Entity]] = Future {
+  private def fetchEntity(itemId: String): Future[Option[Entity]] = Future {
     entityService.fetch(itemId)
   }
 
-  def saveEntity(entity: Entity): Future[Option[Entity]] = Future {
+  private def saveEntity(entity: Entity): Future[Option[Entity]] = Future {
     entityService.save(entity)
   }
 
-  def saveStateMatrix(state: StateMatrix): Future[Option[StateMatrix]] = Future {
+  private def saveStateMatrix(state: StateMatrix): Future[Option[StateMatrix]] = Future {
     stateMatrixService.save(state)
   }
 
-  def fetchStateMatrix(itemId: String): Future[Option[StateMatrix]] = Future {
+  private def fetchStateMatrix(itemId: String): Future[Option[StateMatrix]] = Future {
     stateMatrixService.fetch(itemId)
   }
 
-    val route: Route =
+    protected val route: Route =
       concat(
         post {
           path("state" / Remaining) { id =>
             entity(as[State]) { state =>
               val futureEntity = fetchEntity(id)
+
               onSuccess(futureEntity) {
                 case None => complete(StatusCodes.BadRequest, "{\n\t\"error\": \"No such entity\"\n}")
                 case Some(entity) =>
                   onSuccess(fetchStateMatrix(entity.to.state)) {
-                    case Some(matrix) =>  if (matrix.transitions.contains(state.state))
-
-                      onSuccess(Future(entityService.save(Entity(entity.entity_id, entity.name, entity.to, state)))) {
-                        case Some(ent) => complete(ent)
-                        case None      => complete(StatusCodes.InternalServerError,"{\n\t\"error\": \"Server ERROR. Not saved\"\n}")
+                    case Some(matrix) =>
+                      if (matrix.transitions.contains(state.state)) {
+                        onSuccess(Future(entityService.save(Entity(entity.entity_id, entity.name, entity.to, state)))) {
+                          case Some(ent) => complete(ent)
+                          case None => logger.error("Save entity error in controller")
+                            complete(StatusCodes.InternalServerError, "{\n\t\"error\": \"Server ERROR. Not saved\"\n}")
+                        }
                       }
-                    else
-                      complete(StatusCodes.BadRequest, "{\n\t\"error\": \"No such state to change\"\n}")
-                    case None         =>  complete(StatusCodes.BadRequest, "{\n\t\"error\": \"No such statte to change\"\n}")
+                      else
+                        complete(StatusCodes.BadRequest, "{\n\t\"error\": \"No such state to change\"\n}")
+                    case None => complete(StatusCodes.BadRequest, "{\n\t\"error\": \"No such statte to change\"\n}")
                   }
               }
             }
           }
         },
+
         get {
           pathPrefix("entity" / Remaining) { id =>
             val maybeEntity: Future[Option[Entity]] = fetchEntity(id)
@@ -85,6 +91,7 @@ class Controller(implicit entityService: EntityService, stateMatrixService: Stat
             }
           }
         },
+
         post {
           path("entity") {
             val UUID = System.currentTimeMillis + "-node-name"
@@ -102,19 +109,21 @@ class Controller(implicit entityService: EntityService, stateMatrixService: Stat
             }
           }
         },
+
         post {
           path("state-matrix") {
             entity(as[StateMatrix]) { stateMatrix =>
               val saved: Future[Option[StateMatrix]] = saveStateMatrix(stateMatrix)
               onSuccess(saved) {
                 case Some(state) => complete(state)
-                case None              =>
+                case None        =>     logger.error("Save matrix error")
                   complete(StatusCodes.InternalServerError,"{\n\t\"error\": \"Server ERROR. Not saved\"\n}")
 
               }
             }
           }
         },
+
         get {
           pathPrefix("state-matrix" / Remaining) { id =>
             val maybeMatrix: Future[Option[StateMatrix]] = fetchStateMatrix(id)
@@ -128,17 +137,17 @@ class Controller(implicit entityService: EntityService, stateMatrixService: Stat
       )
 
     def init() {
-
       val locahost = InetAddress.getLocalHost
       val interface = locahost.getHostAddress
       val port = 9000
 
       val bindingFuture = Http().bindAndHandle(route, interface, port)
       bindingFuture.onComplete {
+
         case Success(bound) =>
-          println(s"Server online at http://${bound.localAddress.getHostString}:${bound.localAddress.getPort}/")
+          logger.warn(s"Server online at http://${bound.localAddress.getHostString}:${bound.localAddress.getPort}/")
         case _ =>
-          Console.err.println(s"Server could not start!")
+          logger.error(s"Server could not start!")
       }
     }
 }

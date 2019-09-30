@@ -1,10 +1,12 @@
 package com.kafka
 
+import java.io
 import java.util.Properties
 
 import com.Config
 import com.Util._
 import com.model._
+import com.typesafe.scalalogging.Logger
 import org.apache.kafka.streams.scala.ImplicitConversions._
 import org.apache.kafka.streams.scala.StreamsBuilder
 import org.apache.kafka.streams.scala.kstream.{KStream, KTable, Materialized}
@@ -14,6 +16,7 @@ import spray.json._
 
 class StateStreamProcessor(implicit config: Config)  {
   import org.apache.kafka.streams.scala.Serdes._
+  private val logger = Logger(classOf[StateStreamProcessor])
 
   var entityStateStore: ReadOnlyKeyValueStore[String, String] = _
   var stateMatrixStateStore: ReadOnlyKeyValueStore[String, String] = _
@@ -29,29 +32,39 @@ class StateStreamProcessor(implicit config: Config)  {
   private val builder: StreamsBuilder = new StreamsBuilder
 
   protected val entityStream: KStream[String, String] = builder.stream[String, String](config.inputEntityTopic)
-
-  entityStream.groupByKey.reduce((_,v2) => v2)
-      .filter((_, _) => true, Materialized.as(config.entityStateStore))
+  entityStream.groupByKey.reduce((_, v2) => v2)
+    .filter((_, _) => true, Materialized.as(config.entityStateStore))
 
   protected val stateMatrixStream: KTable[String, String] = builder.table[String, String](config.inputStateTopic)
-  stateMatrixStream.filter((_, _) => true, Materialized.as(config.stateMatrixStateStore))
+  stateMatrixStream
+    .filter((_, _) => true, Materialized.as(config.stateMatrixStateStore))
 
-  entityStream.map((k, v) => {
-    val key = System.currentTimeMillis().toString + "-name-node"
-    val entity = try {
-      v.parseJson.convertTo[Entity]
-    } catch {
-      case e: Exception => println(e)
-        Entity("Failed to serialize message","empty",State("empty"),State("empty"))
-    }
-    val transition = com.model.Transition(key, entity)
-    val value = transition.toJson.toString()
-    (key, value)
+  entityStream.map((_, v) => {
+    val transition = toTransition(v)
+    (transition._1, transition._2)
   }).groupByKey.reduce((v1, v2) => v2)(Materialized.as(config.transitionHistoryStateStore))
     .toStream
     .to(config.transitionHistoryTopic)
 
   protected val streams: KafkaStreams = new KafkaStreams(builder.build(), props)
+
+  protected def toTransition(v: String): (String, String) = {
+    val key = System.currentTimeMillis().toString + "-name-node"
+    val entity: Either[Entity, String] =
+
+      try {
+        Left(v.parseJson.convertTo[Entity])
+      } catch {
+        case e: Exception => logger.error(s"Message -- $v -- can't be serialized into Entity" + e.getMessage)
+          Right(v)
+      }
+
+    val value = entity match {
+      case Left(e)        =>  com.model.Transition(key, e).toJson.toString()
+      case Right(string)  =>  string
+    }
+    (key,value)
+  }
 
   def init(): Unit = {
     streams.start()

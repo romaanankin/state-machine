@@ -14,9 +14,9 @@ object DependencyContainer {
     implicit val entityService: EntityService = new EntityService()
     implicit val stateMatrixRepository: StateMatrixRepository = new StateMatrixRepository()
     implicit val stateMatrixService: StateMatrixService = new StateMatrixService()
+    val controller = new Controller()
     Util.initTopcics
     stream.init()
-//    stream.entityStateStore.all().forEachRemaining(println)
-    new Controller().init()
+    controller.init()
   }
 }

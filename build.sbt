@@ -15,7 +15,10 @@ libraryDependencies ++= Seq(
   "org.slf4j" % "slf4j-simple" % "1.8.0-alpha2",
   "com.typesafe.akka" %% "akka-stream-testkit" % "2.5.23",
   "com.typesafe.akka" %% "akka-http-testkit" % "10.1.10",
-  "org.mockito" % "mockito-all" % "1.9.5" % Test
+  "org.mockito" % "mockito-all" % "1.9.5" % Test,
+  "net.manub" %% "scalatest-embedded-kafka-streams" % "2.0.0" % "test",
+  "com.madewithtea" %% "mockedstreams" % "3.4.0" % "test",
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.9.2"
 )
 
 scalacOptions += "-deprecation"

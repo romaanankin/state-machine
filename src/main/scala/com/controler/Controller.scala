@@ -1,5 +1,7 @@
 package com.controler
 
+import java.net.InetAddress
+
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
@@ -16,6 +18,7 @@ import spray.json.RootJsonFormat
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.io.StdIn
+import scala.util.Success
 
 class Controller(implicit entityService: EntityService, stateMatrixService: StateMatrixService) {
   implicit val system: ActorSystem = ActorSystem()
@@ -47,8 +50,6 @@ class Controller(implicit entityService: EntityService, stateMatrixService: Stat
   def fetchStateMatrix(itemId: String): Future[Option[StateMatrix]] = Future {
     stateMatrixService.fetch(itemId)
   }
-
-  def init() {
 
     val route: Route =
       concat(
@@ -126,11 +127,18 @@ class Controller(implicit entityService: EntityService, stateMatrixService: Stat
         }
       )
 
-    val bindingFuture = Http().bindAndHandle(route, "localhost", 8080)
-    println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
-    StdIn.readLine()
-    bindingFuture
-      .flatMap(_.unbind())
-      .onComplete(_ => system.terminate())
-  }
+    def init() {
+
+      val locahost = InetAddress.getLocalHost
+      val interface = locahost.getHostAddress
+      val port = 9000
+
+      val bindingFuture = Http().bindAndHandle(route, interface, port)
+      bindingFuture.onComplete {
+        case Success(bound) =>
+          println(s"Server online at http://${bound.localAddress.getHostString}:${bound.localAddress.getPort}/")
+        case _ =>
+          Console.err.println(s"Server could not start!")
+      }
+    }
 }

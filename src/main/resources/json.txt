@@ -8,8 +8,8 @@
 
 // to fullfil state matrix
 {
-"state":{"state":"super"},
-"transitions":["Possible","transitions","pending for instance"]
+"state":{"state":"pending"},
+"transitions":["super","class","class1"]
 }
 
 //to change Entity state

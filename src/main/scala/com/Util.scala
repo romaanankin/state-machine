@@ -1,6 +1,5 @@
 package com
 
-import com.Main.{config, producer}
 import com.kafka.StateMachineKafkaProducer
 import com.model._
 import spray.json.DefaultJsonProtocol.{jsonFormat1, _}

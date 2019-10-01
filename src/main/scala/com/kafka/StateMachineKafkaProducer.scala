@@ -6,6 +6,8 @@ import com.Config
 import com.typesafe.scalalogging.Logger
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
 
+import scala.util.{Failure, Success, Try}
+
 class StateMachineKafkaProducer(implicit config: Config) {
   private val logger = Logger(classOf[StateMachineKafkaProducer])
 
@@ -17,17 +19,15 @@ class StateMachineKafkaProducer(implicit config: Config) {
   protected val producer = new KafkaProducer[String, String](props)
 
   def sendToKafka(key: String, value: String, topic: String): Unit = {
-    try {
       val record = new ProducerRecord[String, String](topic, key, value)
-      val metadata = producer.send(record)
-      logger.info(s"Kafka producer sent record(key=%s value=%s) " +
-        "meta(partition=%d, offset=%d)\n",
-        record.key(), record.value(),
-        metadata.get().partition(),
-        metadata.get().offset())
-    } catch {
-      case e: Exception => logger.error(e.getMessage)
-      case _            => logger.error("Unpredictable error during sending message to kafka")
-    }
+
+      Try(producer.send(record)) match {
+        case Success(metadata)  => logger.info(s"Kafka producer sent record(key=%s value=%s) " +
+          "meta(partition=%d, offset=%d)\n",
+          record.key(), record.value(),
+          metadata.get().partition(),
+          metadata.get().offset())
+        case Failure(exception) => logger.error(exception.getMessage)
+      }
   }
 }

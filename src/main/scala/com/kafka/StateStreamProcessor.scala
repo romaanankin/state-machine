@@ -1,6 +1,5 @@
 package com.kafka
 
-import java.io
 import java.util.Properties
 
 import com.Config
@@ -14,13 +13,11 @@ import org.apache.kafka.streams.state.{QueryableStoreTypes, ReadOnlyKeyValueStor
 import org.apache.kafka.streams.{KafkaStreams, StreamsConfig}
 import spray.json._
 
+import scala.util.{Failure, Success, Try}
+
 class StateStreamProcessor(implicit config: Config)  {
   import org.apache.kafka.streams.scala.Serdes._
   private val logger = Logger(classOf[StateStreamProcessor])
-
-  var entityStateStore: ReadOnlyKeyValueStore[String, String] = _
-  var stateMatrixStateStore: ReadOnlyKeyValueStore[String, String] = _
-  var transitionHistoryStateStore: ReadOnlyKeyValueStore[String, String] = _
 
   protected val props: Properties = {
     val p = new Properties()
@@ -30,15 +27,15 @@ class StateStreamProcessor(implicit config: Config)  {
     p
   }
 
-  private val builder: StreamsBuilder = new StreamsBuilder
+  val builder: StreamsBuilder = new StreamsBuilder
 
-  protected val entityStream: KStream[String, String] = builder.stream[String, String](config.inputEntityTopic)
+  val entityStream: KStream[String, String] = builder.stream[String, String](config.inputEntityTopic)
   entityStream
     .groupByKey
     .reduce((_, v2) => v2)
     .filter((_, _) => true, Materialized.as(config.entityStateStore))
 
-  protected val stateMatrixStream: KTable[String, String] = builder.table[String, String](config.inputStateTopic)
+  val stateMatrixStream: KTable[String, String] = builder.table[String, String](config.inputStateTopic)
   stateMatrixStream
     .filter((_, _) => true, Materialized.as(config.stateMatrixStateStore))
 
@@ -46,7 +43,7 @@ class StateStreamProcessor(implicit config: Config)  {
     val transition = toTransition(v)
     (transition._1, transition._2)
   }).groupByKey
-    .reduce((v1, v2) => v2)(Materialized.as(config.transitionHistoryStateStore))
+    .reduce((_, v2) => v2)(Materialized.as(config.transitionHistoryStateStore))
     .toStream
     .to(config.transitionHistoryTopic)
 
@@ -55,12 +52,10 @@ class StateStreamProcessor(implicit config: Config)  {
   protected def toTransition(v: String): (String, String) = {
     val key = System.currentTimeMillis().toString + "-name-node"
     val entity: Either[Entity, String] =
-
-      try {
-        Left(v.parseJson.convertTo[Entity])
-      } catch {
-        case e: Exception => logger.error(s"Message -- $v -- can't be serialized into Entity" + e.getMessage)
-          Right(v)
+      Try(v.parseJson.convertTo[Entity]) match {
+        case Success(message)     => Left(message)
+        case Failure(exception)   => logger.error(exception.getMessage)
+                                     Right(v)
       }
 
     val value = entity match {
@@ -70,11 +65,14 @@ class StateStreamProcessor(implicit config: Config)  {
     (key,value)
   }
 
-  def init(): Unit = {
-    streams.start()
-    Thread.sleep(10000)
-    entityStateStore = streams.store(config.entityStateStore, QueryableStoreTypes.keyValueStore[String, String]())
-    stateMatrixStateStore = streams.store(config.stateMatrixStateStore, QueryableStoreTypes.keyValueStore[String, String]())
-    transitionHistoryStateStore = streams.store(config.transitionHistoryStateStore,QueryableStoreTypes.keyValueStore[String, String]())
-  }
+    val init: Unit = streams.start()
+
+    lazy val entityStateStore: ReadOnlyKeyValueStore[String, String] = streams
+      .store(config.entityStateStore, QueryableStoreTypes.keyValueStore[String, String]())
+
+    lazy val stateMatrixStateStore: ReadOnlyKeyValueStore[String, String] = streams
+      .store(config.stateMatrixStateStore, QueryableStoreTypes.keyValueStore[String, String]())
+
+    lazy val transitionHistoryStateStore: ReadOnlyKeyValueStore[String, String] = streams
+      .store(config.transitionHistoryStateStore,QueryableStoreTypes.keyValueStore[String, String]())
 }

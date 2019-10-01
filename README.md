@@ -159,6 +159,13 @@ incorrect entity Id
 }
 ````
 
+no such transition option
+````
+{
+	"error": "state"
+}
+````
+
 
 
 

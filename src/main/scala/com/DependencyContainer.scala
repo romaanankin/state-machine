@@ -18,7 +18,6 @@ object DependencyContainer {
     implicit val historyService: HistoryService = new HistoryService()
     val controller = new Controller()
     Util.initTopcics
-    stream.init()
     controller.init()
   }
 }

@@ -8,8 +8,8 @@ scala:
   - 2.12.10
 
 script:
-  - sbt scripted
-  -
+  - sbt assembly
+
 before_cache:
   - rm -fv $HOME/.ivy2/.sbt.ivy.lock
   - find $HOME/.ivy2/cache -name "ivydata-*.properties" -print -delete

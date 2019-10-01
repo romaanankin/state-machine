@@ -18,6 +18,7 @@ libraryDependencies ++= Seq(
   "org.mockito" % "mockito-all" % "1.9.5" % Test,
   "net.manub" %% "scalatest-embedded-kafka-streams" % "2.0.0" % "test",
   "com.madewithtea" %% "mockedstreams" % "3.4.0" % "test",
+  "org.apache.kafka" % "kafka-streams-test-utils" % "1.1.0" % Test,
   "com.typesafe.scala-logging" %% "scala-logging" % "3.9.2"
 )
 

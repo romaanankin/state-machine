@@ -29,7 +29,7 @@ services:
 
   state_matchine:
     ports:
-      - "8080:8080"
+      - "9000:9000"
     build: .
     image: state-machine
     hostname: state-machine1

@@ -2,7 +2,6 @@ package com.controler
 
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.testkit.ScalatestRouteTest
-import com.model.Entity
 import com.service.{EntityService, HistoryService, StateMatrixService}
 import org.scalatest.{Matchers, WordSpec}
 import org.scalatestplus.mockito.MockitoSugar
@@ -23,7 +22,7 @@ class ControllerTest extends WordSpec with Matchers with ScalatestRouteTest with
       val id = "some"
       Get( s"/entity/$id") ~> route ~> check {
 
-        handled shouldBe false
+        handled shouldBe true
       }
     }
   }

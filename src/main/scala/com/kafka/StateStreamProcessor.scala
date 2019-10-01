@@ -6,10 +6,11 @@ import com.Config
 import com.Util._
 import com.model._
 import com.typesafe.scalalogging.Logger
+import org.apache.kafka.streams.errors.InvalidStateStoreException
 import org.apache.kafka.streams.scala.ImplicitConversions._
 import org.apache.kafka.streams.scala.StreamsBuilder
 import org.apache.kafka.streams.scala.kstream.{KStream, KTable, Materialized}
-import org.apache.kafka.streams.state.{QueryableStoreTypes, ReadOnlyKeyValueStore}
+import org.apache.kafka.streams.state.{QueryableStoreType, QueryableStoreTypes, ReadOnlyKeyValueStore}
 import org.apache.kafka.streams.{KafkaStreams, StreamsConfig}
 import spray.json._
 
@@ -65,14 +66,31 @@ class StateStreamProcessor(implicit config: Config)  {
     (key,value)
   }
 
-    val init: Unit = streams.start()
+  val init: Unit = streams.start()
 
-    lazy val entityStateStore: ReadOnlyKeyValueStore[String, String] = streams
-      .store(config.entityStateStore, QueryableStoreTypes.keyValueStore[String, String]())
+  @scala.annotation.tailrec
+  final def waitUntilStoreIsQueryable(storeName: String,
+                                      store: QueryableStoreType[ReadOnlyKeyValueStore[String, String]],
+                                      streams: KafkaStreams):ReadOnlyKeyValueStore[String, String] = {
+    Try (streams.store(storeName, store)) match {
+      case Success(result) =>  result
+      case Failure(exception) => logger.error(exception.getMessage)
+        Thread.sleep(100)
+        waitUntilStoreIsQueryable(storeName, store, streams)
+    }
+  }
 
-    lazy val stateMatrixStateStore: ReadOnlyKeyValueStore[String, String] = streams
-      .store(config.stateMatrixStateStore, QueryableStoreTypes.keyValueStore[String, String]())
 
-    lazy val transitionHistoryStateStore: ReadOnlyKeyValueStore[String, String] = streams
-      .store(config.transitionHistoryStateStore,QueryableStoreTypes.keyValueStore[String, String]())
+  lazy val entityStateStore: ReadOnlyKeyValueStore[String, String] =
+    waitUntilStoreIsQueryable(config.entityStateStore,
+    QueryableStoreTypes.keyValueStore[String, String],streams)
+
+  lazy val stateMatrixStateStore: ReadOnlyKeyValueStore[String, String] =
+    waitUntilStoreIsQueryable(config.stateMatrixStateStore,
+    QueryableStoreTypes.keyValueStore[String, String],streams)
+
+  lazy val transitionHistoryStateStore: ReadOnlyKeyValueStore[String, String] =
+    waitUntilStoreIsQueryable(config.transitionHistoryStateStore,
+    QueryableStoreTypes.keyValueStore[String, String],streams)
+
 }

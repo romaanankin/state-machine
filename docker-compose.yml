@@ -35,5 +35,3 @@ services:
     hostname: state-machine1
     depends_on:
       - kafka1
-#    network_mode: "host"
-

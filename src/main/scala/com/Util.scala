@@ -14,9 +14,9 @@ object Util {
   implicit val stateMatrixFormat: RootJsonFormat[StateMatrix] = jsonFormat2(StateMatrix)
   implicit val transitionFormat: RootJsonFormat[Transition] = jsonFormat2(Transition)
   def initTopcics(implicit producer: StateMachineKafkaProducer, config: Config ): Unit = {
-    producer.sendToKafka("heardbeat","entity input topic ",config.inputEntityTopic)
-    producer.sendToKafka("heardbeat","transition input topic ",config.transitionHistoryTopic)
-    producer.sendToKafka("heardbeat","state input topic ",config.inputStateTopic)
+    producer.sendToKafka("heardbeat","It's okay, just a test message after app launch",config.inputEntityTopic)
+    producer.sendToKafka("heardbeat","It's okay, just a test message after app launch",config.transitionHistoryTopic)
+    producer.sendToKafka("heardbeat","It's okay, just a test message after app launch",config.inputStateTopic)
     logger.info("Initialize messages with Key --heartbeat-- hear sended to Kafka")
   }
 }

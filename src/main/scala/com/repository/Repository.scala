@@ -5,6 +5,7 @@ import com.Util._
 import com.kafka.{StateMachineKafkaProducer, StateStreamProcessor}
 import com.model._
 import com.typesafe.scalalogging.Logger
+import org.apache.kafka.streams.state.KeyValueIterator
 import spray.json._
 
 trait Repository[E,K] {
@@ -76,5 +77,24 @@ class StateMatrixRepository(implicit kafkaProducer: StateMachineKafkaProducer,
                                None
       case _               =>  None
     }
+  }
+}
+
+class HistoryRepository (implicit kafkaProducer: StateMachineKafkaProducer,
+                                   store: StateStreamProcessor,config: Config) {
+
+  private val logger: Logger = Logger(classOf[HistoryRepository])
+
+  def fetchAll(): Option[List[String]] = {
+
+    val buffer = scala.collection.mutable.ListBuffer.empty[String]
+    val s: KeyValueIterator[String, String] = store.transitionHistoryStateStore.all()
+    while (s.hasNext) {
+      val n = s.next().value.toString
+      buffer += n
+    }
+    buffer.foreach(println )
+    val result: List[String] = buffer.toList
+    Option(result)
   }
 }

@@ -1,7 +1,7 @@
 package com.service
 
 import com.model._
-import com.repository.{EntityRepository, StateMatrixRepository}
+import com.repository._
 
 trait Service[E,K] {
   def save(entity: E): Option[E]
@@ -18,4 +18,9 @@ class StateMatrixService (implicit p: StateMatrixRepository) extends Service [St
   def save(e: StateMatrix): Option[StateMatrix] = p.save(e)
 
   def fetch(key: String): Option[StateMatrix] = p.fetch(key)
+}
+
+class HistoryService (implicit p: HistoryRepository) {
+  def fetchAll(): Option[List[String]] = p.fetchAll()
+
 }

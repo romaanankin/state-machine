@@ -20,6 +20,7 @@ class StateStreamProcessor(implicit config: Config)  {
 
   var entityStateStore: ReadOnlyKeyValueStore[String, String] = _
   var stateMatrixStateStore: ReadOnlyKeyValueStore[String, String] = _
+  var transitionHistoryStateStore: ReadOnlyKeyValueStore[String, String] = _
 
   protected val props: Properties = {
     val p = new Properties()
@@ -32,7 +33,9 @@ class StateStreamProcessor(implicit config: Config)  {
   private val builder: StreamsBuilder = new StreamsBuilder
 
   protected val entityStream: KStream[String, String] = builder.stream[String, String](config.inputEntityTopic)
-  entityStream.groupByKey.reduce((_, v2) => v2)
+  entityStream
+    .groupByKey
+    .reduce((_, v2) => v2)
     .filter((_, _) => true, Materialized.as(config.entityStateStore))
 
   protected val stateMatrixStream: KTable[String, String] = builder.table[String, String](config.inputStateTopic)
@@ -42,7 +45,8 @@ class StateStreamProcessor(implicit config: Config)  {
   entityStream.map((_, v) => {
     val transition = toTransition(v)
     (transition._1, transition._2)
-  }).groupByKey.reduce((v1, v2) => v2)(Materialized.as(config.transitionHistoryStateStore))
+  }).groupByKey
+    .reduce((v1, v2) => v2)(Materialized.as(config.transitionHistoryStateStore))
     .toStream
     .to(config.transitionHistoryTopic)
 
@@ -71,5 +75,6 @@ class StateStreamProcessor(implicit config: Config)  {
     Thread.sleep(10000)
     entityStateStore = streams.store(config.entityStateStore, QueryableStoreTypes.keyValueStore[String, String]())
     stateMatrixStateStore = streams.store(config.stateMatrixStateStore, QueryableStoreTypes.keyValueStore[String, String]())
+    transitionHistoryStateStore = streams.store(config.transitionHistoryStateStore,QueryableStoreTypes.keyValueStore[String, String]())
   }
 }

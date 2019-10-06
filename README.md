@@ -2,8 +2,8 @@
 
 State machine allows you to create entities 
 and modify them in runtime by changing their state according to 
-predefined state matrix which also can be fulfilled and overridden in runtime.
-
+predefined state matrix which also can be fulfilled and overridden in runtime. The principle based
+on [finite state machine architecture from Erlang](http://erlang.org/documentation/doc-4.8.2/doc/design_principles/fsm.html)
 ## Getting Started
 
 These instructions will get you a copy of the proje

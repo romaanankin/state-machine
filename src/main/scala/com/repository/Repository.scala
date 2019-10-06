@@ -89,5 +89,4 @@ class HistoryRepository (implicit kafkaProducer: StateMachineKafkaProducer,
                                  None
     }
   }
-
 }
